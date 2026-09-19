@@ -1,10 +1,12 @@
 """Implementations for the wrsrcli subcommands."""
 
 import datetime
+import shutil
 import sys
 from pathlib import Path
 
-from . import config, scan, steam, steamapi, steamcmd, table
+from . import APP_ID, backup, config, importer, importlist, scan, steam
+from . import steamapi, steamcmd, table
 from .errors import WrsrcliError
 
 # Verbatim per SPEC.md 4.2 — do not reword.
@@ -177,6 +179,181 @@ def cmd_output_table(args):
         raise WrsrcliError(f"could not write {destination}: {exc}") from exc
 
     print(f"Wrote {len(rows)} row(s) to {destination}")
+    return 0
+
+
+def _choose(prompt, count):
+    """Prompt for a 1..count selection. ENTER returns None (cancel)."""
+    while True:
+        answer = input(prompt).strip()
+        if not answer:
+            return None
+        if answer.isdigit() and 1 <= int(answer) <= count:
+            return int(answer)
+        print(f"Please enter a number from 1 to {count}, or press ENTER to cancel.")
+
+
+def _resolve_conflicts(conflicts):
+    """Settle every overlapping destination before anything is written (D-010)."""
+    chosen = []
+    skipped = []
+
+    for destination, candidates in conflicts.items():
+        print(f"\nConflict: {len(candidates)} sources map to {destination}")
+        for index, candidate in enumerate(candidates, 1):
+            when = importer.describe_mtime(candidate.source)
+            print(f"   {index}. {candidate.source.name:<30} - modified {when}")
+        print()
+
+        pick = _choose("Please select which to copy (or press ENTER to skip this file): ", len(candidates))
+        if pick is None:
+            skipped.append(destination)
+        else:
+            chosen.append(candidates[pick - 1])
+
+    return chosen, skipped
+
+
+def _ensure_origin_present(item_id, workshop_root):
+    """The origin item's folder, downloading it via SteamCMD if absent."""
+    folder = workshop_root / item_id
+    if folder.is_dir():
+        return folder
+
+    install_path = steam.steam_path() / "steamcmd"
+    if not steamcmd.is_installed(install_path):
+        raise WrsrcliError(
+            f"origin item {item_id} is not installed locally and SteamCMD is not "
+            "available to download it — run `wrsrcli steamcmd --install` first."
+        )
+
+    print(f"Origin item {item_id} is not installed locally. Downloading via SteamCMD ...")
+    result, downloaded = steamcmd.download_workshop_item(install_path, APP_ID, item_id)
+    if downloaded is None:
+        raise WrsrcliError(
+            f"SteamCMD could not download item {item_id} "
+            f"(exit code {result.returncode}). Subscribe to it in Steam, or "
+            "download it manually, then re-run this import."
+        )
+    print(f"Downloaded to {downloaded}")
+    return downloaded
+
+
+def cmd_import(args):
+    recipe = importlist.load(Path(args.path).expanduser())
+
+    game_path = resolve_game_path()
+    workshop_root = resolve_workshop_path()
+    origin_folder = _ensure_origin_present(recipe.item, workshop_root)
+
+    # Plan everything and settle conflicts before touching a single file.
+    planned, conflicts = importer.plan_copies(
+        recipe.copies, origin_folder, game_path, workshop_root
+    )
+    if conflicts:
+        chosen, skipped = _resolve_conflicts(conflicts)
+        planned.extend(chosen)
+        for destination in skipped:
+            print(f"Skipped (conflict unresolved): {destination}")
+
+    run = backup.Run(recipe.item)
+
+    written = importer.execute_copies(planned, run)
+    removed, missing = importer.execute_removals(
+        recipe.removals, game_path, workshop_root, run
+    )
+    logged = run.commit()
+
+    for raw in missing:
+        print(f"warning: nothing to remove at {raw}", file=sys.stderr)
+
+    print(f"\nCopied {written} file(s); removed {removed} target(s).")
+    if logged:
+        print(f"Backed up {logged} original(s) to {run.folder}")
+    else:
+        print("Nothing needed backing up — no existing files were overwritten.")
+    return 0
+
+
+def _pick_generation(steamid, entries, verb):
+    """Select one backup generation, prompting only if there are several."""
+    grouped = backup.generations(entries)
+    ordered = sorted(grouped.items(), key=lambda pair: pair[0][1], reverse=True)
+
+    if len(ordered) == 1:
+        return ordered[0][1]
+
+    print(f"{len(ordered)} backup versions found for {steamid}. Select which to {verb}:")
+    for index, ((origin, stamp), group) in enumerate(ordered, 1):
+        counterpart = origin if verb == "restore" else group[0].get("destination", "?")
+        label = "from" if verb == "restore" else "affecting"
+        print(
+            f"   {index}. {backup.describe(stamp)} - {label} {counterpart} "
+            f"- {len(group)} file(s)"
+        )
+    print()
+
+    pick = _choose("Please select (or press ENTER to cancel): ", len(ordered))
+    return None if pick is None else ordered[pick - 1][1]
+
+
+def _put_back(entries):
+    """Return each backed-up file to its original location."""
+    restored = 0
+    for entry in entries:
+        original = Path(entry["original_path"])
+        stored = Path(entry["backup_path"])
+        if not stored.exists():
+            print(
+                f"warning: backup missing for {original} (expected {stored})",
+                file=sys.stderr,
+            )
+            continue
+        try:
+            original.parent.mkdir(parents=True, exist_ok=True)
+            if stored.is_dir():
+                shutil.copytree(stored, original, dirs_exist_ok=True)
+            else:
+                shutil.copy2(stored, original)
+        except OSError as exc:
+            raise WrsrcliError(f"could not restore {original}: {exc}") from exc
+        restored += 1
+    return restored
+
+
+def cmd_restore(args):
+    steamid = str(args.steamid)
+    entries = [e for e in backup.load() if e.get("destination") == steamid]
+    if not entries:
+        print(f"No backups recorded with {steamid} as the destination.")
+        return 0
+
+    chosen = _pick_generation(steamid, entries, "restore")
+    if chosen is None:
+        print("Cancelled — nothing was changed.")
+        return 0
+
+    restored = _put_back(chosen)
+    print(f"Restored {restored} file(s) belonging to {steamid}.")
+    return 0
+
+
+def cmd_rollback(args):
+    steamid = str(args.steamid)
+    entries = [e for e in backup.load() if e.get("origin_steamid") == steamid]
+    if not entries:
+        print(f"No backups recorded with {steamid} as the origin.")
+        return 0
+
+    chosen = _pick_generation(steamid, entries, "roll back")
+    if chosen is None:
+        print("Cancelled — nothing was changed.")
+        return 0
+
+    # A rollback undoes what this origin did: files it overwrote and files
+    # it removed both come back from the backup store.
+    restored = _put_back(chosen)
+    print(f"Rolled back {restored} change(s) made by {steamid}.")
     return 0
 
 

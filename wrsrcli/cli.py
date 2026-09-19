@@ -48,19 +48,19 @@ def build_parser():
         "import", help="apply a YAML import list's copy/remove operations"
     )
     import_.add_argument("path", help="path to the YAML import list")
-    import_.set_defaults(func=_not_implemented("import"))
+    import_.set_defaults(func=commands.cmd_import)
 
     restore = subcommands.add_parser(
         "restore", help="restore files that imports overwrote on this item"
     )
     restore.add_argument("steamid", help="destination workshop item ID")
-    restore.set_defaults(func=_not_implemented("restore"))
+    restore.set_defaults(func=commands.cmd_restore)
 
     rollback = subcommands.add_parser(
         "rollback", help="undo changes this item's import made elsewhere"
     )
     rollback.add_argument("steamid", help="origin workshop item ID")
-    rollback.set_defaults(func=_not_implemented("rollback"))
+    rollback.set_defaults(func=commands.cmd_rollback)
 
     manual_rerun = subcommands.add_parser(
         "manual-rerun", help="re-apply all tracked import lists"

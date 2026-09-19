@@ -267,7 +267,12 @@ remove:
     intentional — supports import lists that patch/alter another mod's
     files.
   - Conflict/overwrite order when multiple `copy` entries
-    (e.g. `*` and a specific named file) target overlapping destinations: Surface to user, present selectable options with dates the change occured.
+    (e.g. `*` and a specific named file) target overlapping destinations:
+    surface to the user and present selectable options with the dates of
+    the candidate source files. An overlap is two or more entries
+    resolving the same destination file from *different* sources;
+    detection runs after `*`/directory expansion and before any file is
+    written, and ENTER skips that destination. See decision D-010.
 - `remove`: list of destination paths to remove. Always in `[GAME]` or
   `[WORKSHOP]/{id}/` space (destination paths, not origin-relative).
 
@@ -348,11 +353,24 @@ logged before it happens. Nothing is ever permanently deleted — a
 **Terminology:** *origin* = the item whose import caused a change;
 *destination* = the item or game-file location that was changed.
 
+**Storage layout** (decision D-009): the manifest is
+`%APPDATA%\wrsrcli\backups.json`; backed-up files live at
+`%APPDATA%\wrsrcli\backups\{origin}\{YYYYMMDD-HHMMSS}\{nnn}_{filename}`,
+one timestamped folder per `import` run (one run = one generation). Two
+runs of the same origin inside one second get a `-2`, `-3`, ... suffix, so
+a generation can never reuse another's folder and overwrite its backups.
+The
+original location is recorded only in the manifest's `original_path`, not
+encoded in the backup path, which keeps backup paths short and immune to
+Windows' 260-character limit.
+
 **Multi-version prompt:** applies to both `restore` and `rollback`. If the
 given steamid has more than one relevant backup generation — as a
 destination hit by multiple origins (`restore`), or as an origin imported
 multiple times (`rollback`) — the user is asked to choose which version
-to act on. Exact prompt wording/UI: **OPEN**.
+to act on. Wording and behavior per decision D-009; generations are listed
+newest first with timestamp, counterpart steamid and file count, and ENTER
+cancels. A single generation is acted on without prompting.
 
 ---
 
@@ -371,6 +389,7 @@ to act on. Exact prompt wording/UI: **OPEN**.
 4. ~~Alternate-path flag syntax for `wrsrcli steamcmd --install`.~~
    **CLOSED** by decision D-008 (2026-09-19): `-p` / `--path`, and only
    ENTER confirms the download. See §3.
-5. Exact wording/UI for the multi-version restore/rollback prompt.
+5. ~~Exact wording/UI for the multi-version restore/rollback prompt.~~
+   **CLOSED** by decision D-009 (2026-09-19). See §5.
 6. GitHub Actions build trigger for the `.exe` release (push / tag /
    manual dispatch) — see `EXECUTION-PLAN.md` Phase 10.
