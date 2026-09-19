@@ -309,6 +309,13 @@ lists currently tracked (i.e. reapplies them). Intended for the case where
 Steam has silently reverted files (see §4.7) — manual-only, no automatic
 detection or scheduling; runs only when invoked.
 
+Tracked lists live in `%APPDATA%\wrsrcli\imports.json`, with a verbatim
+copy of each list at `%APPDATA%\wrsrcli\imports\{origin}\{stamp}.yaml`
+(decision D-011 — the backup manifest in §5 cannot describe a `copy`'s
+source, so it alone is not enough to replay an import). The most recent
+registered list per origin item is replayed, through the same planning,
+conflict-resolution and backup-before-write path as a first-time import.
+
 ### 4.7 `wrsrcli manual-check`
 
 Because Steam can silently revert manually-placed files (on workshop item
@@ -322,12 +329,20 @@ tracked backup entry for staleness and flags candidates for
   `.acf` is newer, the destination has been touched by Steam since the
   backup was made → flag.
 - For a backup entry whose **destination** is `[GAME]/...`: no `.acf`
-  applies to game files. Instead, compare the actual filesystem modified
-  timestamp of the file at that game path against the backup entry's
-  timestamp. If the file's mtime is newer → flag.
-  - Known limitation: this check can false-positive (anything touching
-    the file's mtime without changing content would trigger it). This is
-    accepted for v1, not solved.
+  applies to game files. Instead, compare the file's current mtime against
+  the entry's `placed_mtime` — the mtime the file had immediately after the
+  import wrote it. If it is newer → flag. Entries predating that field fall
+  back to comparing against the entry's `timestamp`.
+  - `placed_mtime` exists because `copy2` preserves the *source's* mtime,
+    so a freshly-imported file does not carry the time of the copy.
+    Comparing against the backup's timestamp instead would flag every
+    import the moment it finished. See decision D-012.
+  - Known limitation: this check can still false-positive (anything
+    touching the file's mtime without changing content would trigger it).
+    Accepted for v1, not solved.
+  - Known limitation: only backed-up files are tracked. An import that
+    *adds* files without overwriting anything creates no backup entries,
+    so those files are not checked for reversion.
 - If a destination has multiple backup generations, compare against the
   most recent relevant entry.
 

@@ -28,4 +28,7 @@ phase's "Verify" step has been run and passed.
 |2026-09-19|23:51|Phases 7 and 8 started together (D-009 closing open item #5, and D-010 for copy-overlap mechanics; SPEC 4.3, 5 and 6 updated).|
 |2026-09-19|23:52|Phases 7 and 8 finished. Verify passed: 22 checks in a sandbox (APPDATA redirected, disposable game/workshop fixtures, real config and game folder never touched). Covered the conflict prompt, `*`/directory/file sources, `[GAME]` and `[WORKSHOP]/{id}/` destinations, removals of files and folders, absent targets warning without failing, backup-before-write for both actions, `restore` returning a destination's file byte-for-byte, `rollback` undoing both overwrites and removals, the multi-generation prompt with ENTER-cancel and re-prompt on bad input. Found and fixed a same-second run-stamp collision that would have let one generation overwrite another's backups. Total development time this phase: 00:01.|
 
-Total development time across all phases: 00:12.
+|2026-09-19|23:53|Phase 9 started (D-011 for import-list tracking, since SPEC 5's backup schema cannot describe a copy's source).|
+|2026-09-19|23:54|Phase 9 finished. Verify passed: 14 sandboxed checks — import registered with a verbatim copy of the list, clean state flags nothing, a simulated Steam revert is detected and names the right file, `manual-rerun` replays from the stored copy and restores the expected state while backing up what it overwrote, and an empty registry is handled gracefully. Found and fixed a false positive that flagged every import the moment it completed (D-012). Phase 7-8 suite re-run: no regression. Total development time this phase: 00:01.|
+
+Total development time across all phases: 00:13.

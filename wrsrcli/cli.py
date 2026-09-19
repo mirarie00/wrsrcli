@@ -65,12 +65,12 @@ def build_parser():
     manual_rerun = subcommands.add_parser(
         "manual-rerun", help="re-apply all tracked import lists"
     )
-    manual_rerun.set_defaults(func=_not_implemented("manual-rerun"))
+    manual_rerun.set_defaults(func=commands.cmd_manual_rerun)
 
     manual_check = subcommands.add_parser(
         "manual-check", help="flag tracked imports that Steam may have reverted"
     )
-    manual_check.set_defaults(func=_not_implemented("manual-check"))
+    manual_check.set_defaults(func=commands.cmd_manual_check)
 
     api = subcommands.add_parser("api", help="set or remove the Steam Web API key")
     api.add_argument("key", nargs="?", help="the Steam Web API key to store")

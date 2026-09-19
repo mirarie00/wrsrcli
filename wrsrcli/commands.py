@@ -5,8 +5,8 @@ import shutil
 import sys
 from pathlib import Path
 
-from . import APP_ID, backup, config, importer, importlist, scan, steam
-from . import steamapi, steamcmd, table
+from . import APP_ID, acf, backup, config, history, importer, importlist
+from . import scan, staleness, steam, steamapi, steamcmd, table
 from .errors import WrsrcliError
 
 # Verbatim per SPEC.md 4.2 — do not reword.
@@ -239,9 +239,12 @@ def _ensure_origin_present(item_id, workshop_root):
     return downloaded
 
 
-def cmd_import(args):
-    recipe = importlist.load(Path(args.path).expanduser())
+def _apply(recipe, list_path):
+    """Plan, settle conflicts, then execute one import list.
 
+    Shared by `import` and `manual-rerun` — a rerun goes through exactly
+    the same planning and backup-before-write path (decision D-011).
+    """
     game_path = resolve_game_path()
     workshop_root = resolve_workshop_path()
     origin_folder = _ensure_origin_present(recipe.item, workshop_root)
@@ -264,6 +267,9 @@ def cmd_import(args):
     )
     logged = run.commit()
 
+    # Registered even when nothing was backed up, so every run is replayable.
+    history.register(list_path, recipe.item, run.stamp)
+
     for raw in missing:
         print(f"warning: nothing to remove at {raw}", file=sys.stderr)
 
@@ -272,6 +278,54 @@ def cmd_import(args):
         print(f"Backed up {logged} original(s) to {run.folder}")
     else:
         print("Nothing needed backing up — no existing files were overwritten.")
+    return written, removed
+
+
+def cmd_import(args):
+    list_path = Path(args.path).expanduser()
+    _apply(importlist.load(list_path), list_path)
+    return 0
+
+
+def cmd_manual_rerun(args):
+    tracked = history.latest_per_origin()
+    if not tracked:
+        print("No import lists are tracked yet — run `wrsrcli import {path}` first.")
+        return 0
+
+    print(f"Re-applying {len(tracked)} tracked import list(s).")
+    for origin, entry in sorted(tracked.items()):
+        stored = Path(entry["stored_list"])
+        if not stored.exists():
+            print(
+                f"warning: stored copy for {origin} is missing ({stored}) — skipped",
+                file=sys.stderr,
+            )
+            continue
+        print(f"\n--- {origin} (from {entry['list_path']}) ---")
+        _apply(importlist.load(stored), stored)
+    return 0
+
+
+def cmd_manual_check(args):
+    entries = backup.load()
+    if not entries:
+        print("No imports are tracked yet — nothing to check.")
+        return 0
+
+    acf_path = steam.workshop_acf()
+    items = acf.parse(acf_path) if acf_path.exists() else {}
+
+    flagged = staleness.check(entries, items)
+    if not flagged:
+        print(f"Checked {len(entries)} tracked change(s); nothing looks reverted.")
+        return 0
+
+    print(f"{len(flagged)} tracked change(s) may have been reverted:\n")
+    for entry, reason in flagged:
+        print(f"  {entry['original_path']}")
+        print(f"    origin {entry['origin_steamid']} -> {entry['destination']}: {reason}")
+    print("\nRun `wrsrcli manual-rerun` to re-apply the tracked import lists.")
     return 0
 
 

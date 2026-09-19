@@ -75,8 +75,9 @@ def execute_copies(planned, run):
             ) from exc
 
         # Back up before overwriting — never the other way round (SPEC.md 5).
+        entry = None
         if item.destination.exists():
-            run.stash_overwrite(item.destination_id, item.destination)
+            entry = run.stash_overwrite(item.destination_id, item.destination)
 
         try:
             shutil.copy2(item.source, item.destination)
@@ -84,6 +85,18 @@ def execute_copies(planned, run):
             raise WrsrcliError(
                 f"could not copy {item.source} to {item.destination}: {exc}"
             ) from exc
+
+        # Record the mtime this file has now that we placed it. copy2 carries
+        # the *source's* mtime across, so "now" is the wrong baseline and the
+        # backup's own timestamp would make manual-check flag every import the
+        # moment it finished. This is the value 4.7's staleness check compares
+        # against later.
+        if entry is not None:
+            try:
+                entry["placed_mtime"] = item.destination.stat().st_mtime
+            except OSError:
+                pass
+
         written += 1
 
     return written
