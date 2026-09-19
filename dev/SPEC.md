@@ -118,9 +118,10 @@ override autodetected values.
 
 ### `wrsrcli steamcmd -i` / `wrsrcli steamcmd --install`
 
-Installs SteamCMD. Default install location: `[STEAMPATH]/steamcmd`, with
-an option to choose another path (mechanism for specifying an alternate
-path: **OPEN** — likely an additional flag, not yet named).
+Installs SteamCMD. Default install location: `[STEAMPATH]/steamcmd`. An
+alternate path is given with `-p "{path}"` / `--path "{path}"` (decision
+D-008); the directory is created if it does not exist. `-p` without `-i`
+is a usage error.
 
 On running, prints, verbatim:
 
@@ -129,6 +130,8 @@ Press ENTER to automatically download and install steamcmd from Valve. If you pr
    https://developer.valvesoftware.com/wiki/SteamCMD
 ```
 
+- **Only an empty line (ENTER) proceeds.** Any other input cancels and
+  nothing is downloaded (decision D-008).
 - On ENTER: `wrsrcli` downloads the official SteamCMD zip from Valve,
   extracts it to the install path, and runs `steamcmd.exe` once (which
   self-bootstraps/updates on first run). This is the only place in the
@@ -365,7 +368,9 @@ to act on. Exact prompt wording/UI: **OPEN**.
 3. ~~`manifest.json` output location.~~ **CLOSED** by decision D-003
    (2026-09-19): `%APPDATA%\wrsrcli\manifest.json`, no path argument.
    See §4.1.
-4. Alternate-path flag syntax for `wrsrcli steamcmd --install`.
+4. ~~Alternate-path flag syntax for `wrsrcli steamcmd --install`.~~
+   **CLOSED** by decision D-008 (2026-09-19): `-p` / `--path`, and only
+   ENTER confirms the download. See §3.
 5. Exact wording/UI for the multi-version restore/rollback prompt.
 6. GitHub Actions build trigger for the `.exe` release (push / tag /
    manual dispatch) — see `EXECUTION-PLAN.md` Phase 10.

@@ -4,7 +4,7 @@ import datetime
 import sys
 from pathlib import Path
 
-from . import config, scan, steam, steamapi, table
+from . import config, scan, steam, steamapi, steamcmd, table
 from .errors import WrsrcliError
 
 # Verbatim per SPEC.md 4.2 — do not reword.
@@ -25,6 +25,11 @@ COLLISION_PROMPT = """WRSR Assets.html found. Do you want to:
 Please select: """
 
 OUTPUT_NAME = "WRSR Assets.html"
+
+# Verbatim per SPEC.md 3 — do not reword.
+STEAMCMD_PROMPT = """Press ENTER to automatically download and install steamcmd from Valve. If you prefer to download and install yourself, please open this link:
+   https://developer.valvesoftware.com/wiki/SteamCMD
+"""
 
 
 def _store_path(key, raw, label):
@@ -172,6 +177,45 @@ def cmd_output_table(args):
         raise WrsrcliError(f"could not write {destination}: {exc}") from exc
 
     print(f"Wrote {len(rows)} row(s) to {destination}")
+    return 0
+
+
+def cmd_steamcmd(args):
+    if not args.install:
+        if args.path:
+            raise WrsrcliError("`--path` only applies with `--install`.")
+        print("wrsrcli steamcmd: nothing to do — pass -i/--install.", file=sys.stderr)
+        return 1
+
+    install_path = (
+        Path(args.path).expanduser() if args.path else steam.steam_path() / "steamcmd"
+    )
+
+    if steamcmd.is_installed(install_path):
+        print(f"SteamCMD is already installed at {install_path}")
+        return 0
+
+    print(STEAMCMD_PROMPT)
+    # Only an empty line proceeds; anything else cancels (decision D-008).
+    if input().strip():
+        print("Cancelled — nothing was downloaded.")
+        return 0
+
+    print(f"Downloading SteamCMD from Valve to {install_path} ...")
+    size = steamcmd.install(install_path)
+    print(f"Downloaded and extracted {size:,} bytes.")
+
+    print("Running steamcmd.exe once to let it self-update (this can take a while) ...")
+    result = steamcmd.bootstrap(install_path)
+    if result.returncode not in (0, 7):
+        # 7 is SteamCMD's normal exit after a bare bootstrap on some builds.
+        print(
+            f"warning: steamcmd.exe exited with code {result.returncode} during "
+            "its first run.",
+            file=sys.stderr,
+        )
+
+    print(f"SteamCMD ready at {steamcmd.executable(install_path)}")
     return 0
 
 

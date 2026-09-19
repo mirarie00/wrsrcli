@@ -22,4 +22,7 @@ phase's "Verify" step has been run and passed.
 |2026-09-19|23:45|Phase 5 started (code-only, by agreement; verification deferred until a key is available).|
 |2026-09-19|23:47|Phase 5 **code complete, UNVERIFIED — phase NOT finished.** Both endpoints implemented, enrichment wired into `output-table`, D-007 recorded. Offline checks passed (8-column API render, author fallback, D-007 degradation, key absent from output, no-API regression). The live `GetPublishedFileDetails`/`GetPlayerSummaries` calls have never been executed — Phase 5's Verify step remains outstanding and requires a stored API key. Development time so far this phase: 00:02.|
 
-Total development time across all phases: 00:09.
+|2026-09-19|23:48|Phase 6 started (D-008 recorded, closing open item #4; SPEC 3 and 6 updated).|
+|2026-09-19|23:50|Phase 6 finished. Verify passed: verbatim prompt; only ENTER proceeds and a non-empty reply downloads nothing; `--path` without `--install` and bare `steamcmd` are usage errors; the default path short-circuits, leaving the existing install untouched. Installed to a throwaway path — 774,825 bytes downloaded, self-bootstrapped to client version 1788292693, then downloaded workshop item 3780739284 anonymously (712,541 bytes, matching the `.acf` size) with all 5 files SHA256-identical to the installed copy. Total development time this phase: 00:02.|
+
+Total development time across all phases: 00:11.

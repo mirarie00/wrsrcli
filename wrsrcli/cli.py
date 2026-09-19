@@ -96,7 +96,13 @@ def build_parser():
     steamcmd.add_argument(
         "-i", "--install", action="store_true", help="download and install SteamCMD"
     )
-    steamcmd.set_defaults(func=_not_implemented("steamcmd"))
+    steamcmd.add_argument(
+        "-p",
+        "--path",
+        metavar="PATH",
+        help="install to PATH instead of [STEAMPATH]/steamcmd",
+    )
+    steamcmd.set_defaults(func=commands.cmd_steamcmd)
 
     return parser
 
