@@ -11,8 +11,10 @@ renders a searchable HTML overview, and can apply user-authored "import
 lists" that copy/remove files into the game or into other workshop items'
 folders (with backup/restore/rollback).
 
-Full behavioral spec: see `SPEC.md`. Build order and current status: see
-`EXECUTION-PLAN.md`.
+Full behavioral spec: see `dev/SPEC.md`. Build order: see
+`dev/EXECUTION-PLAN.md`. Current status: see `dev/Progress.md`. The
+records kept under `dev/` and their formats are defined in
+`dev/REPO-STRUCTURE.md`.
 
 ## Stack
 
@@ -66,6 +68,27 @@ changes, not just before writing new code.
   confirmation prompt before downloading anything). Don't add other
   automatic downloads or subprocess execution without an equivalent,
   explicit user-facing prompt.
+
+## Development record-keeping
+
+`dev/REPO-STRUCTURE.md` defines the development records kept in this repo
+and the exact filename and body format for each. Follow it — these are
+part of doing the work, not paperwork to catch up on afterwards.
+
+- **Progress tracker (`dev/Progress.md`).** Log an entry at both the
+  **start and the end of every phase** in `dev/EXECUTION-PLAN.md`. The
+  end-of-phase entry is written only once that phase's "Verify" step has
+  actually been run and passed — a phase is not done because the code
+  exists, it is done because its success criterion was checked (see
+  Principle 4).
+- **Decisions (`dev/decisions/`).** Any resolution of an open item in
+  `SPEC.md` §6, or any other non-obvious call, gets a `D-NNN` record
+  before the code that depends on it is written. Record the tradeoffs, not
+  just the conclusion.
+- **Bugs (`dev/bugs/`).** Logged as `B-NNN` records.
+
+Where a record and the code disagree, that is drift worth reporting — say
+so rather than quietly bringing one into line with the other.
 
 ## Working conventions
 

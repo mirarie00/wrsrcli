@@ -38,14 +38,22 @@ implementation — implement around them or stop and ask.
   - An item present in `WorkshopItemDetails` but **not** in
     `WorkshopItemsInstalled` is subscribed-but-not-downloaded.
 - Workshop content folder: `steamapps/workshop/content/784150/{item_id}/`.
-- Game install folder: `steamapps/common/Workers & Resources Soviet Republic/`
-  (exact folder name to be confirmed against a real install — verify when
-  first implementing autodetect).
+- Game install folder: `steamapps/common/{installdir}/`, where
+  `{installdir}` is read from the `"installdir"` key in
+  `steamapps/appmanifest_784150.acf` in whichever library folder holds app
+  `784150`. Not hardcoded — see decision D-001. On a stock install this
+  resolves to `steamapps/common/SovietRepublic/`; the display name
+  `Workers & Resources: Soviet Republic` is the manifest's `"name"` field,
+  not the directory name. If the manifest is missing or has no
+  `installdir`, autodetect fails and reports so rather than guessing; the
+  user sets the path explicitly with `wrsrcli path --game "{path}"`.
 
 ### 2.2 `workshopconfig.ini`
 
 Each downloaded workshop item's folder contains a `workshopconfig.ini` in
-Valve's own `$KEY value` syntax (not real INI, not YAML, not JSON — a
+Valve's own `$KEY value` syntax — it ships with every workshop download,
+so an item lacking one has had the file deleted locally (see decision
+D-005 for how `scan` handles that) (not real INI, not YAML, not JSON — a
 line-oriented `$-prefixed` key/value format, with a `$END` terminator).
 Confirmed fields, from a real sample:
 
@@ -135,23 +143,32 @@ Press ENTER to automatically download and install steamcmd from Valve. If you pr
 
 ### 4.1 `wrsrcli scan`
 
-Builds `manifest.json` (location: **OPEN** — likely `%APPDATA%\wrsrcli\`
-or a user-specified output path; not yet decided) from the local workshop
-folder and `.acf` file. One entry per installed workshop item:
+Builds `manifest.json` at `%APPDATA%\wrsrcli\manifest.json` (decision
+D-003) from the local workshop folder and `.acf` file. One entry per
+installed workshop item, as a JSON array:
 
 ```json
 {
   "item_id": "3780739284",
   "owner_id": "76561198050524085",
   "item_type": "WORKSHOP_ITEMTYPE_SCRIPT",
-  "date_created": "...",
-  "date_modified": "..."
+  "date_updated": "1788306308",
+  "date_touched": "1789051884"
 }
 ```
 
-- `date_created` / `date_modified` are sourced from the `.acf` file
+- `date_updated` / `date_touched` are sourced from the `.acf` file
   (`timeupdated`/`timetouched` in `WorkshopItemDetails`), not filesystem
-  timestamps — filesystem mtimes can be wrong after a copy/restore.
+  timestamps — filesystem mtimes can be wrong after a copy/restore. They
+  are stored as the raw Unix timestamp strings the `.acf` holds;
+  formatting is left to `output-table`.
+- There is deliberately no `date_created`: no creation date exists in any
+  local source. The item's posted date comes from the Steam Web API
+  (§4.2, Phase 5). See decision D-004.
+- `owner_id` and `item_type` are **nullable**. They come from
+  `workshopconfig.ini`; if that file has been deleted locally the entry is
+  still written, with those two fields null and a warning naming the item.
+  See decision D-005.
 
 ### 4.2 `wrsrcli output-table`
 
@@ -201,10 +218,16 @@ Please select:
 - Timestamp format for option 2: `WRSR Assets
   YYYY-MM-DD HH-mm.html`.
 
-**Table columns:** Item ID, Filename, Item Type (category) / raw `$TAGS`
-values (subcategory — meaning not yet mapped, see §2.2), Author name (API
-mode) or Owner ID (no-API mode), Posted date, Updated date, File size (API
-mode only).
+**Table columns:** Item ID, Name (`$ITEM_NAME` — see decision D-006; the
+folder name is not shown separately, because folder names *are* item IDs),
+Item Type (category) / raw `$TAGS` values (subcategory — meaning not yet
+mapped, see §2.2), Owner ID, Updated date. In API mode, additionally:
+Author name (replacing Owner ID), Posted date, File size.
+
+In no-API mode the Author name, Posted date and File size columns are
+omitted rather than rendered empty — this section's own no-API data list
+gives no local source for any of them ("No file size, no resolved author
+name, no separately-sourced posted date").
 
 ### 4.3 `wrsrcli import {path}`
 
@@ -334,9 +357,14 @@ to act on. Exact prompt wording/UI: **OPEN**.
 
 1. Meaning of numeric `$TAGS` values in `workshopconfig.ini` (category/
    subcategory mapping) — deferred, raw values shown for now.
-2. Exact game install folder name under `steamapps/common/` — confirm
-   against a real install.
-3. `manifest.json` output location.
+2. ~~Exact game install folder name under `steamapps/common/`.~~
+   **CLOSED** by decision D-001 (2026-09-19): resolved at runtime from
+   `appmanifest_784150.acf`'s `installdir` key, not hardcoded. See §2.1.
+   *(Item numbering retained so existing `EXECUTION-PLAN.md` references
+   stay valid.)*
+3. ~~`manifest.json` output location.~~ **CLOSED** by decision D-003
+   (2026-09-19): `%APPDATA%\wrsrcli\manifest.json`, no path argument.
+   See §4.1.
 4. Alternate-path flag syntax for `wrsrcli steamcmd --install`.
 5. Exact wording/UI for the multi-version restore/rollback prompt.
 6. GitHub Actions build trigger for the `.exe` release (push / tag /

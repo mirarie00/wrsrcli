@@ -51,9 +51,11 @@ both depend on.
    keys like `$TAGS`, `$OBJECT_BUILDING`; multi-line quoted `$ITEM_DESC`;
    `$END` terminator).
 
-**Verify:** against the real sample in `SPEC.md` §2.2 (and the empty test
-workshop folder), parsing produces a correct in-memory record — check by
-hand against the raw file contents, not just "it didn't crash."
+**Verify:** against the real sample in `SPEC.md` §2.2 — item `3779842468`
+is present in the local workshop folder, so parse its actual
+`workshopconfig.ini` and check the resulting record by hand against the
+raw file contents, not just "it didn't crash." Include an item with
+repeating `$TAGS`/`$OBJECT_BUILDING` lines and a multi-line `$ITEM_DESC`.
 
 ---
 
@@ -63,12 +65,11 @@ Implements §4.1. Depends on Phase 1 (paths) and Phase 2 (`.acf` parsing).
 
 1. Enumerate installed workshop items from `.acf`.
 2. Write `manifest.json` (schema per §4.1; output location per open item
-   #4 — resolve or flag before writing this phase's code).
+   #3 — resolve or flag before writing this phase's code).
 
-**Verify:** run `wrsrcli scan` against the empty test workshop folder →
-produces a valid, empty (or near-empty) `manifest.json`. Once at least one
-real item is present locally, re-run and confirm the entry's fields match
-the `.acf` data by hand-inspection.
+**Verify:** run `wrsrcli scan` against the real workshop folder → produces
+a valid `manifest.json` with one entry per installed item. Confirm a
+sampled entry's fields match the `.acf` data by hand-inspection.
 
 ---
 
@@ -80,15 +81,14 @@ Implements §4.2, minus Steam Web API enrichment. Depends on Phase 2
 1. API-key-check message (verbatim per spec) when no key is stored.
 2. Build table rows from `manifest.json` + `workshopconfig.ini` only.
 3. Save-location prompt and overwrite/timestamp collision prompt
-   (verbatim per spec; resolve open item #5 — timestamp format — before
-   or during this step).
+   (both verbatim per spec; timestamp format is specified in §4.2 —
+   `WRSR Assets YYYY-MM-DD HH-mm.html`).
 4. Render self-contained HTML: embedded JSON data, vanilla JS
    search/filter/sort, no external/CDN dependencies.
 
 **Verify:** run without an API key set → correct message printed, table
 built from local data only, opens correctly in a browser, search/filter/
-sort work on at least a hand-crafted multi-row test dataset (since the
-real test folder is empty).
+sort work against the real workshop folder's items.
 
 ---
 
@@ -115,16 +115,19 @@ Implements the `wrsrcli steamcmd --install` part of §3. Depends on Phase 1
 
 1. Confirmation prompt (verbatim per spec).
 2. Download SteamCMD zip from Valve, extract to `[STEAMPATH]/steamcmd`
-   (or chosen path — resolve open item #6, the alternate-path flag,
+   (or chosen path — resolve open item #4, the alternate-path flag,
    before this step).
 3. Run `steamcmd.exe` once to trigger self-bootstrap.
 4. A minimal wrapper for invoking SteamCMD to download a specific
    workshop item by app ID + item ID (needed by Phase 7).
 
-**Verify:** on a clean machine/path with no SteamCMD present, running
-`wrsrcli steamcmd --install` and pressing ENTER results in a working
-`steamcmd.exe` that can be invoked to download a known public workshop
-item.
+**Verify:** SteamCMD is already installed at the default target on the dev
+machine (`[STEAMPATH]/steamcmd`), so verify against a throwaway path
+instead — this exercises the same alternate-path flag that open item #4
+covers, and leaves the existing install untouched. Running
+`wrsrcli steamcmd --install` at that path and pressing ENTER results in a
+working `steamcmd.exe` that can be invoked to download a known public
+workshop item.
 
 ---
 
@@ -137,9 +140,9 @@ invocation), and the backup mechanism (Phase 8 — build these together, as
 1. YAML import-list parser matching the schema in `SPEC.md` §4.3.
 2. Presence check for the origin item; SteamCMD download if missing.
 3. `copy` execution, honoring `*` = everything except
-   `workshopconfig.ini`; resolve open item #2 (overlap order) before
-   implementing multi-entry overlap handling — if unresolved, implement
-   only the non-overlapping case and flag the gap.
+   `workshopconfig.ini`. Where multiple `copy` entries target overlapping
+   destinations, §4.3 specifies the behavior: surface the conflict to the
+   user and present selectable options with the dates the change occurred.
 4. `remove` execution (move to backup, never delete — see Phase 8).
 
 **Verify:** hand-crafted import list against a disposable test copy of a
@@ -154,12 +157,12 @@ the backup folder).
 Implements §5, §4.4, §4.5. Built alongside Phase 7 since `import` depends
 on backup-before-write.
 
-1. Backup manifest read/write (schema per §5; resolve open item #7 —
-   backup folder location — before writing this phase's code).
+1. Backup manifest read/write (schema per §5; backup folder location is
+   specified in §5 — `%APPDATA%\wrsrcli\backups\`).
 2. Backup-before-write hook used by `import`'s `copy`/`remove` execution.
 3. `wrsrcli restore {steamid}` — query backup manifest for entries where
    this steamid is the `destination`; single-version case first, then
-   multi-version prompt (resolve open item #8 — prompt wording — before
+   multi-version prompt (resolve open item #5 — prompt wording — before
    implementing the prompt).
 4. `wrsrcli rollback {steamid}` — query backup manifest for entries where
    this steamid is the `origin_steamid`; same single/multi-version
@@ -191,6 +194,24 @@ steamid, confirm `manual-rerun` restores the expected state.
 
 ---
 
+## Phase 10 — Packaged `.exe` release
+
+Implements the build/release side referenced by `SPEC.md` §6 item 6.
+Depends on Phase 9 (feature-complete CLI).
+
+1. Package the CLI as a standalone Windows `.exe`. This adds a build-time
+   dependency (PyInstaller or equivalent) — it is a CI/build dependency
+   only, not a runtime import, so it does not change the stdlib-first rule
+   for the tool itself.
+2. GitHub Actions workflow to produce the `.exe` and attach it to a
+   release. **Trigger (push / tag / manual dispatch) is open item #6 —
+   resolve before writing the workflow.**
+
+**Verify:** the workflow produces an `.exe` that runs `wrsrcli --help`
+successfully on a Windows machine with no Python installed.
+
+---
+
 ## Notes for whoever (human or agent) picks this up
 
 - Resolve or explicitly flag each numbered open item in `SPEC.md` §6
@@ -199,6 +220,7 @@ steamid, confirm `manual-rerun` restores the expected state.
 - Every phase's "Verify" step is the actual success criterion for that
   phase, per the Karpathy goal-driven-execution principle in
   `AGENTS.md`. Don't mark a phase complete without running it.
-- Phases 3–5 (scan/output-table/API) can be built and tested against the
-  empty test workshop folder for structural correctness, but full
-  verification needs at least one real subscribed item.
+- Phases 3–5 (scan/output-table/API) verify against the real workshop
+  folder, which currently holds 21 installed items — enough for a
+  meaningful multi-row table in Phase 4. Phase 5 additionally needs a
+  Steam Web API key, which is the only outstanding prerequisite.
