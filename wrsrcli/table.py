@@ -50,13 +50,35 @@ def _format_date(raw):
     return moment.strftime("%Y-%m-%d")
 
 
-def build_rows(entries, workshop_path):
+def _format_size(raw):
+    """Byte count -> a compact human-readable size, or '' if unusable."""
+    if raw in (None, ""):
+        return ""
+    try:
+        size = float(raw)
+    except (TypeError, ValueError):
+        return ""
+
+    for unit in ("B", "KB", "MB", "GB"):
+        if size < 1024 or unit == "GB":
+            return f"{size:.0f} {unit}" if unit == "B" else f"{size:.1f} {unit}"
+        size /= 1024
+    return ""
+
+
+def build_rows(entries, workshop_path, details=None, authors=None):
     """Combine manifest entries with each item's workshopconfig.ini.
 
     SPEC.md 4.2 sources the display name and tags from 2.2 data, which the
     manifest schema (4.1) does not carry, so the config files are read here
     at render time. The manifest itself is not rebuilt.
+
+    `details` and `authors` carry Steam Web API enrichment when a key is
+    set; both are None in the no-API path.
     """
+    details = details or {}
+    authors = authors or {}
+
     rows = []
     for entry in entries:
         item_id = entry.get("item_id", "")
@@ -70,20 +92,34 @@ def build_rows(entries, workshop_path):
             tags = record.get(TAGS, [])
 
         item_type = entry.get("item_type") or ""
-        updated = entry.get("date_updated")
+        owner_id = entry.get("owner_id")
+        enriched = details.get(item_id, {})
 
-        rows.append(
-            {
-                "item_id": item_id,
-                "name": name,
-                "item_type": item_type.replace(TYPE_PREFIX, "") or "—",
-                "item_type_raw": item_type,
-                "tags": ", ".join(tags),
-                "owner_id": entry.get("owner_id") or "—",
-                "updated": _format_date(updated),
-                "updated_sort": int(updated) if updated else 0,
-            }
-        )
+        # The API's time_updated is authoritative where present; the .acf's
+        # value is what the no-API path has to work with.
+        updated = enriched.get("time_updated") or entry.get("date_updated")
+        posted = enriched.get("time_created")
+        size = enriched.get("file_size")
+
+        row = {
+            "item_id": item_id,
+            "name": name,
+            "item_type": item_type.replace(TYPE_PREFIX, "") or "—",
+            "item_type_raw": item_type,
+            "tags": ", ".join(tags),
+            "owner_id": owner_id or "—",
+            "updated": _format_date(updated),
+            "updated_sort": int(updated) if updated else 0,
+        }
+
+        if details or authors:
+            row["author"] = authors.get(owner_id) or (owner_id or "—")
+            row["posted"] = _format_date(posted)
+            row["posted_sort"] = int(posted) if posted else 0
+            row["size"] = _format_size(size)
+            row["size_sort"] = int(size) if size else 0
+
+        rows.append(row)
     return rows
 
 
@@ -278,8 +314,9 @@ _TEMPLATE = """<!DOCTYPE html>
 </html>
 """
 
-# No-API columns only (SPEC.md 4.2). Author name, Posted date and File size
-# arrive with Web API enrichment in Phase 5.
+# SPEC.md 4.2. In no-API mode Author name, Posted date and File size are
+# omitted rather than rendered empty — there is no local source for any of
+# them.
 COLUMNS = [
     {"key": "item_id", "label": "Item ID", "cls": "id"},
     {"key": "name", "label": "Name", "cls": "name"},
@@ -287,6 +324,17 @@ COLUMNS = [
     {"key": "tags", "label": "Tags"},
     {"key": "owner_id", "label": "Owner ID", "cls": "owner"},
     {"key": "updated", "label": "Updated", "sort": "updated_sort"},
+]
+
+COLUMNS_API = [
+    {"key": "item_id", "label": "Item ID", "cls": "id"},
+    {"key": "name", "label": "Name", "cls": "name"},
+    {"key": "item_type", "label": "Type"},
+    {"key": "tags", "label": "Tags"},
+    {"key": "author", "label": "Author"},
+    {"key": "posted", "label": "Posted", "sort": "posted_sort"},
+    {"key": "updated", "label": "Updated", "sort": "updated_sort"},
+    {"key": "size", "label": "Size", "sort": "size_sort"},
 ]
 
 
@@ -298,5 +346,5 @@ def render(rows, api_mode=False):
         generated=generated,
         mode=mode,
         data=_embed(rows),
-        columns=_embed(COLUMNS),
+        columns=_embed(COLUMNS_API if api_mode else COLUMNS),
     )

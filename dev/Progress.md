@@ -19,5 +19,7 @@ phase's "Verify" step has been run and passed.
 |2026-09-19|23:41|Phase 4 started (D-006 recorded; SPEC 4.2 column list updated).|
 |2026-09-19|23:44|Phase 4 finished. Verify passed: verbatim no-API message; save prompt incl. ENTER-to-Documents default; collision prompt both branches with `WRSR Assets YYYY-MM-DD HH-mm.html` timestamp; HTML has zero external references; search, type filter, text sort (asc/desc) and numeric date sort all exercised in a browser against the real 21-item dataset. Total development time this phase: 00:03.|
 |2026-09-19|23:44|Phase 5 blocked: requires a Steam Web API key, which is not set. Awaiting input.|
+|2026-09-19|23:45|Phase 5 started (code-only, by agreement; verification deferred until a key is available).|
+|2026-09-19|23:47|Phase 5 **code complete, UNVERIFIED — phase NOT finished.** Both endpoints implemented, enrichment wired into `output-table`, D-007 recorded. Offline checks passed (8-column API render, author fallback, D-007 degradation, key absent from output, no-API regression). The live `GetPublishedFileDetails`/`GetPlayerSummaries` calls have never been executed — Phase 5's Verify step remains outstanding and requires a stored API key. Development time so far this phase: 00:02.|
 
-Total development time across all phases: 00:07.
+Total development time across all phases: 00:09.

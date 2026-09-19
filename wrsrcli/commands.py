@@ -4,7 +4,7 @@ import datetime
 import sys
 from pathlib import Path
 
-from . import config, scan, steam, table
+from . import config, scan, steam, steamapi, table
 from .errors import WrsrcliError
 
 # Verbatim per SPEC.md 4.2 — do not reword.
@@ -123,25 +123,51 @@ def _resolve_output(folder):
         print("Please enter 1 or 2.")
 
 
-def cmd_output_table(args):
-    if not config.get(config.API_KEY):
-        print(NO_API_KEY_MESSAGE)
-        print()
-    else:
-        # Phase 5 adds Web API enrichment; until then a stored key changes
-        # nothing about the output, and saying so beats implying otherwise.
+def _enrich(key, entries):
+    """Fetch Web API metadata. Returns (details, authors, api_mode).
+
+    A failure here degrades to the local-only table rather than aborting a
+    run that can still produce useful output (decision D-007).
+    """
+    item_ids = [e["item_id"] for e in entries if e.get("item_id")]
+    owner_ids = sorted({e["owner_id"] for e in entries if e.get("owner_id")})
+
+    try:
+        details = steamapi.published_file_details(item_ids)
+        authors = steamapi.player_names(key, owner_ids)
+    except WrsrcliError as exc:
+        print(f"warning: {exc}", file=sys.stderr)
         print(
-            "A Steam Web API key is stored, but Steam Web API enrichment is not "
-            "implemented yet — building from local data only."
+            "warning: falling back to local data only — the table will omit "
+            "author name, posted date and file size.",
+            file=sys.stderr,
         )
+        return None, None, False
+
+    print(
+        f"Retrieved Steam Web API metadata for {len(details)} item(s) and "
+        f"{len(authors)} author(s)."
+    )
+    return details, authors, True
+
+
+def cmd_output_table(args):
+    key = config.get(config.API_KEY)
+    if not key:
+        print(NO_API_KEY_MESSAGE)
         print()
 
     entries = table.load_manifest()
-    rows = table.build_rows(entries, resolve_workshop_path())
+
+    details, authors, api_mode = (None, None, False)
+    if key:
+        details, authors, api_mode = _enrich(key, entries)
+
+    rows = table.build_rows(entries, resolve_workshop_path(), details, authors)
 
     destination = _resolve_output(_prompt_save_folder())
     try:
-        destination.write_text(table.render(rows), encoding="utf-8")
+        destination.write_text(table.render(rows, api_mode), encoding="utf-8")
     except OSError as exc:
         raise WrsrcliError(f"could not write {destination}: {exc}") from exc
 
