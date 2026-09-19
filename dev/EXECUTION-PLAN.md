@@ -204,11 +204,18 @@ Depends on Phase 9 (feature-complete CLI).
    only, not a runtime import, so it does not change the stdlib-first rule
    for the tool itself.
 2. GitHub Actions workflow to produce the `.exe` and attach it to a
-   release. **Trigger (push / tag / manual dispatch) is open item #6 —
-   resolve before writing the workflow.**
+   release. Trigger resolved by decision D-013 (open item #6): tags
+   matching `v*`, plus `workflow_dispatch`. Windows-only, since `winreg`
+   makes other platforms impossible.
 
 **Verify:** the workflow produces an `.exe` that runs `wrsrcli --help`
 successfully on a Windows machine with no Python installed.
+
+**Status:** the `.exe` is built and confirmed working (`--version`,
+`--help`, `winreg` via `path --auto-detect`, and bundled PyYAML via a full
+`import` run, from a cleared environment outside the repo). The "no Python
+installed" half of the criterion is **not** verified — it needs a machine
+without Python, which the dev machine is not. See D-013.
 
 ---
 

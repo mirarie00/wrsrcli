@@ -406,5 +406,8 @@ cancels. A single generation is acted on without prompting.
    ENTER confirms the download. See §3.
 5. ~~Exact wording/UI for the multi-version restore/rollback prompt.~~
    **CLOSED** by decision D-009 (2026-09-19). See §5.
-6. GitHub Actions build trigger for the `.exe` release (push / tag /
-   manual dispatch) — see `EXECUTION-PLAN.md` Phase 10.
+6. ~~GitHub Actions build trigger for the `.exe` release (push / tag /
+   manual dispatch).~~ **CLOSED** by decision D-013 (2026-09-19): tags
+   matching `v*` plus `workflow_dispatch`, building
+   `wrsrcli-windows-amd64.exe` on `windows-latest`. See
+   `EXECUTION-PLAN.md` Phase 10 and `.github/workflows/release.yml`.

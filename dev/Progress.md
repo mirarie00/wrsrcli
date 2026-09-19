@@ -31,4 +31,10 @@ phase's "Verify" step has been run and passed.
 |2026-09-19|23:53|Phase 9 started (D-011 for import-list tracking, since SPEC 5's backup schema cannot describe a copy's source).|
 |2026-09-19|23:54|Phase 9 finished. Verify passed: 14 sandboxed checks — import registered with a verbatim copy of the list, clean state flags nothing, a simulated Steam revert is detected and names the right file, `manual-rerun` replays from the stored copy and restores the expected state while backing up what it overwrote, and an empty registry is handled gracefully. Found and fixed a false positive that flagged every import the moment it completed (D-012). Phase 7-8 suite re-run: no regression. Total development time this phase: 00:01.|
 
-Total development time across all phases: 00:13.
+|2026-09-19|23:55|Phase 10 started (D-013 closing open item #6: `v*` tags plus manual dispatch, Windows-only).|
+|2026-09-19|23:57|Phase 10 **code complete, verify PARTIAL.** Workflow added; `.exe` built locally with PyInstaller 6.22.3 and confirmed working — `--version`, `--help` listing all 10 subcommands, bundled `winreg` via `path --auto-detect`, bundled PyYAML via a full `import`, run outside the repo with PYTHONPATH/PYTHONHOME cleared. The criterion's "on a Windows machine with no Python installed" half is NOT verified and cannot be from this machine. Total development time this phase: 00:02.|
+
+Total development time across all phases: 00:15.
+
+All 6 numbered open items in `SPEC.md` §6 are now closed (D-001, D-003,
+D-008, D-009, D-013) or deferred by design (#1, the `$TAGS` mapping).
